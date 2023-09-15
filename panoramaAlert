@@ -1,12 +1,20 @@
 import datetime
+import config
 import pickle
 import xml.etree.ElementTree as ET
 import smtplib
 from panos import panorama
 
-username = 'admin'
-password = ''
-hostname = '172.16.160.163'
+# Username and password for Panorama
+username = config.USERNAME
+password = config.PASSWORD
+hostname = config.HOSTNAME
+
+# SMTP Connection
+from_email = config.FROM_EMAIL
+to_email = config.TO_EMAIL
+smtp_server = config.SMTP_SERVER
+smtp_port = 25
 
 # Load disconnected device status from file
 try:
@@ -41,9 +49,15 @@ try:
                 hostname = deviceEntry.find('.//hostname').text
                 # Alert on down devices
                 if connected != 'yes' and hostname not in disconnectedDevices:
-                    print(f'Device {hostname} is disconnected.')
+                    with smtplib.SMTP(smtp_server, smtp_port) as smtp:
+                        message = f'Subject: {hostname} is down\n\nDevice {hostname} is disconnected from Panorama.'
+                        smtp.starttls()
+                        smtp.sendmail(from_email, to_email, message)
                 if connected == 'yes' and hostname in disconnectedDevices:
-                    print(f'Device {hostname} is connected.')
+                    with smtplib.SMTP(smtp_server, smtp_port) as smtp:
+                        message = f'Subject: {hostname} is up\n\nDevice {hostname} is connected to Panorama.'
+                        smtp.starttls()
+                        smtp.sendmail(from_email, to_email, message)
                 # Update status of devices
                 if connected == 'yes':
                     disconnectedDevices.pop(hostname, None)
