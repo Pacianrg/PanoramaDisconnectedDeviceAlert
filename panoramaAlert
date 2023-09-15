@@ -1,0 +1,58 @@
+import datetime
+import pickle
+import xml.etree.ElementTree as ET
+import smtplib
+from panos import panorama
+
+username = 'admin'
+password = ''
+hostname = '172.16.160.163'
+
+# Load disconnected device status from file
+try:
+    with open('disconnected_devices.pickle', "rb") as f:
+        disconnectedDevices = pickle.load(f)
+except Exception as e:
+    print(f'Failed to load disconnected devices {e}')
+    disconnectedDevices = {}
+
+try:
+    # Connect to Panorama with panos
+    panConnect = panorama.Panorama(hostname, username, password)
+    devices = panConnect.op(cmd='show devices all', xml=True)
+except Exception as e:
+    print(f'Error connecting to Panorama: {e}')
+    exit()
+
+# Pull devices from the XML in the prior operational command
+try:
+    responseXml = ET.fromstring(devices)
+except Exception as e:
+    print(f'Failed XML parse: {e}')
+
+# Check currently connected devices
+try:
+    for deviceEntry in responseXml.iter('entry'):
+        connected = deviceEntry.find('.//connected')
+        hostname = deviceEntry.find('.//hostname')
+        if connected is not None:
+            connected = deviceEntry.find('.//connected').text
+            if hostname is not None:
+                hostname = deviceEntry.find('.//hostname').text
+                # Alert on down devices
+                if connected != 'yes' and hostname not in disconnectedDevices:
+                    print(f'Device {hostname} is disconnected.')
+                if connected == 'yes' and hostname in disconnectedDevices:
+                    print(f'Device {hostname} is connected.')
+                # Update status of devices
+                if connected == 'yes':
+                    disconnectedDevices.pop(hostname, None)
+                else:
+                    disconnectedDevices[hostname] = True
+except Exception as e:
+    print(f'Error when parsing devices: {e}')
+try:
+    with open('disconnected_devices.pickle', 'wb') as f:
+        pickle.dump(disconnectedDevices, f)
+except Exception as e:
+    print(f'Failed to save disconnected devices {e}')
