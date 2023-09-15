@@ -1,0 +1,6 @@
+USERNAME = ''
+PASSWORD = ''
+HOSTNAME = ''
+FROM_EMAIL = ''
+TO_EMAIL = ''
+SMTP_SERVER = ""
