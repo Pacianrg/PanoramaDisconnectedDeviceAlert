@@ -16,12 +16,15 @@ to_email = config.TO_EMAIL
 smtp_server = config.SMTP_SERVER
 smtp_port = 25
 
+# Current time for recording how long a device was down
+currentTime = datetime.datetime.now().timestamp()
+
 # Load disconnected device status from file
 try:
     with open('disconnected_devices.pickle', "rb") as f:
         disconnectedDevices = pickle.load(f)
 except Exception as e:
-    print(f'Failed to load disconnected devices {e}')
+    print(f'Failed to load disconnected devices: {e} Making new file.')
     disconnectedDevices = {}
 
 try:
@@ -47,22 +50,31 @@ try:
             connected = deviceEntry.find('.//connected').text
             if hostname is not None:
                 hostname = deviceEntry.find('.//hostname').text
-                # Alert on down devices
+                # Alert on down devices that haven't already been down
                 if connected != 'yes' and hostname not in disconnectedDevices:
+                    # Record device and time it went down
+                    disconnectedDevices[hostname] = currentTime
+                    # Alert device is down
                     with smtplib.SMTP(smtp_server, smtp_port) as smtp:
                         message = f'Subject: {hostname} is down\n\nDevice {hostname} is disconnected from Panorama.'
                         smtp.starttls()
                         smtp.sendmail(from_email, to_email, message)
+                # Check if device is up after being down
                 if connected == 'yes' and hostname in disconnectedDevices:
+                    # Calculate time between it going down and coming back up
+                    downTime = disconnectedDevices[hostname]
+                    upTime = currentTime
+                    timeDifference = int(upTime) - int(downTime)
+                    hours, remainder = divmod(timeDifference, 3600)
+                    minutes, _ = divmod(remainder, 60)
+                    # Send message of device coming up and the time it took
                     with smtplib.SMTP(smtp_server, smtp_port) as smtp:
-                        message = f'Subject: {hostname} is up\n\nDevice {hostname} is connected to Panorama.'
+                        message = f'Subject: {hostname} is up\n\nDevice {hostname} is connected to Panorama ' \
+                                  f'after {hours} hours and {minutes} minutes'
                         smtp.starttls()
                         smtp.sendmail(from_email, to_email, message)
-                # Update status of devices
-                if connected == 'yes':
+                    # Update file storing devices
                     disconnectedDevices.pop(hostname, None)
-                else:
-                    disconnectedDevices[hostname] = True
 except Exception as e:
     print(f'Error when parsing devices: {e}')
 try:
