@@ -4,6 +4,7 @@ import pickle
 import xml.etree.ElementTree as ET
 import smtplib
 from panos import panorama
+import os
 
 # Username and password for Panorama
 username = config.USERNAME
@@ -19,9 +20,12 @@ smtp_port = 25
 # Current time for recording how long a device was down
 currentTime = datetime.datetime.now().timestamp()
 
+# Create the pickle file path
+pickleFilePath = config.FILE_PATH
+
 # Load disconnected device status from file
 try:
-    with open('disconnected_devices.pickle', "rb") as f:
+    with open(pickleFilePath, "rb") as f:
         disconnectedDevices = pickle.load(f)
 except Exception as e:
     print(f'Failed to load disconnected devices: {e} Making new file.')
@@ -78,7 +82,7 @@ try:
 except Exception as e:
     print(f'Error when parsing devices: {e}')
 try:
-    with open('disconnected_devices.pickle', 'wb') as f:
+    with open(pickleFilePath, 'wb') as f:
         pickle.dump(disconnectedDevices, f)
 except Exception as e:
     print(f'Failed to save disconnected devices {e}')
